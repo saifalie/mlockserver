@@ -35,7 +35,7 @@ const MongoDBStore = connectMongo(session);
 
 // Set up the session store with MongoDB
 const sessionStore = new MongoDBStore({
-    uri: process.env.MONGO_URI as string,
+    uri: process.env.DB_URL as string,
     collection: 'sessions'
 });
 
