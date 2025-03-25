@@ -4,6 +4,7 @@ export var PaymentStatus;
     PaymentStatus["PAID"] = "PAID";
     PaymentStatus["OVERDUE"] = "OVERDUE";
     PaymentStatus["PENDING"] = "PENDING";
+    PaymentStatus["CANCELLED"] = "CANCELLED";
 })(PaymentStatus || (PaymentStatus = {}));
 const bookingSchema = new Schema({
     user: {
@@ -16,31 +17,41 @@ const bookingSchema = new Schema({
         ref: 'Locker',
         required: true
     },
+    lockerStation: {
+        type: Schema.Types.ObjectId,
+        ref: 'LockerStation',
+        required: true
+    },
+    isExpired: {
+        type: Boolean,
+        required: true,
+        default: false
+    },
     duration: {
         type: Number,
         required: true
     },
-    checkin_time: {
+    checkinTime: {
         type: Date,
-        required: true
+        // required: true
     },
-    checkout_time: {
+    checkoutTime: {
         type: Date,
-        required: true
+        // required: true
     },
-    user_checkout_time: {
+    userCheckoutTime: {
         type: Date
     },
-    extra_time: {
+    extraTime: {
         type: Number,
         required: true,
         default: 0
     },
-    rental_price: {
+    rentalPrice: {
         type: Number,
         required: true
     },
-    payment_status: {
+    paymentStatus: {
         type: String,
         required: true,
         enum: Object.values(PaymentStatus),
@@ -51,7 +62,16 @@ const bookingSchema = new Schema({
             type: Schema.Types.ObjectId,
             ref: 'Payment'
         }
-    ]
+    ],
+    notificationSent: {
+        type: Boolean,
+        default: false
+    }
 }, { timestamps: true });
+bookingSchema.index({
+    checkoutTime: 1,
+    notificationSent: 1,
+    isExpired: 1
+});
 export const Booking = model('Booking', bookingSchema);
 //# sourceMappingURL=booking.model.js.map

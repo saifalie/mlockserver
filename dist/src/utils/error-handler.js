@@ -1,6 +1,6 @@
 import { ErrorCode, HttpException } from '../errors/root.js';
 import { InternalException } from '../errors/internal-exception.js';
-export const errorHanlder = (method) => {
+export const errorHandler = (method) => {
     return async (req, res, next) => {
         try {
             await method(req, res, next);

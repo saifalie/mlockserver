@@ -8,13 +8,18 @@ import { connectDB } from './config/connect.js';
 import { notFoundMiddleware } from './middlewares/not-found.js';
 import { buildAdminRouter } from './config/setup.js';
 import rootRouter from './routes/index.routes.js';
-import helmet from 'helmet';
+import cors from 'cors';
+import { initializeCronJobs } from './jobs/index.js';
 dotenv.config();
 // Initialize express app
 const app = express();
-app.enable('trust proxy');
+// app.enable('trust proxy');
 app.use(express.json());
-app.use(helmet());
+// app.use(helmet());
+app.use(cors({
+    origin: ['http://localhost:7000', 'http://192.168.10.109:7000', 'http://49.43.5.123:7000'],
+    credentials: true
+}));
 // server instance
 const server = http.createServer(app);
 // io instance (WebSocket)
@@ -22,7 +27,8 @@ const corsOrigin = process.env.NODE_ENV === 'production' ? process.env.CORS : 'h
 const io = new Server(server, {
     cors: {
         origin: corsOrigin,
-        methods: ['GET', 'POST']
+        methods: ['GET', 'POST'],
+        // credentials:true
     }
 });
 // Attach the websocket instance to the request object
@@ -36,6 +42,10 @@ handleSocketConnection(io);
 buildAdminRouter(app);
 // routes
 app.use('/api', rootRouter);
+const espAddress = process.env.ESP_WEBSOCKET_ADDRESS || '';
+// const espClient = new ESPWebSocketClient(espAddress)
+//ws esp
+// app.use('/esp',ledRouter(espClient))
 // Middlewares
 app.use(errorMiddleware);
 app.use(notFoundMiddleware);
@@ -43,7 +53,9 @@ app.use(notFoundMiddleware);
 const startServer = async () => {
     try {
         await connectDB();
-        const port = Number(process.env.PORT) || 3000; // Convert to number
+        const port = Number(process.env.PORT) || 3000;
+        // Initialize cron jobs after DB connection
+        initializeCronJobs();
         server.listen({
             port: port,
             host: '0.0.0.0'

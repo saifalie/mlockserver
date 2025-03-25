@@ -14,8 +14,7 @@ export const admin = new AdminJS({
         { resource: Models.User },
         { resource: Models.Locker },
         { resource: Models.LockerStation },
-        { resource: Models.Rating },
-        { resource: Models.Review },
+        { resource: Models.RatingAndReview },
         { resource: Models.Payment },
         { resource: Models.Booking }
     ],

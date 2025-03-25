@@ -3,12 +3,17 @@ var Currency;
 (function (Currency) {
     Currency["INR"] = "INR";
 })(Currency || (Currency = {}));
+export var PaymentType;
+(function (PaymentType) {
+    PaymentType["INITIAL"] = "INITIAL";
+    PaymentType["EXTRA_TIME"] = "EXTRA_TIME";
+})(PaymentType || (PaymentType = {}));
 const paymentSchema = new Schema({
-    order_id: {
+    orderId: {
         type: String,
         required: true
     },
-    payment_id: {
+    paymentId: {
         type: String,
         required: true
     },
@@ -34,7 +39,12 @@ const paymentSchema = new Schema({
         type: String,
         required: true
     },
-    card_id: {
+    paymentType: {
+        type: String,
+        required: true,
+        enum: Object.values(PaymentType),
+    },
+    cardId: {
         type: String
     },
     bank: {

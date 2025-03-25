@@ -1,42 +1,45 @@
 import mongoose, { Schema } from 'mongoose';
 const lockerSchema = new Schema({
-    locker_number: {
+    lockerNumber: {
         type: Number,
         required: true,
-        unique: false
+        unique: false,
     },
     status: {
         type: String,
         enum: ['AVAILABLE', 'BOOKED', 'MAINTENANCE'],
         default: 'AVAILABLE'
     },
-    door_status: {
+    doorStatus: {
         type: String,
         enum: ['OPEN', 'CLOSED'],
         default: 'CLOSED'
     },
-    current_user: {
+    currentUser: {
         type: Schema.Types.ObjectId,
-        ref: 'User'
+        ref: 'User',
+        default: null
     },
     size: {
         type: String,
         enum: ['SMALL', 'MEDIUM', 'LARGE'],
         default: 'MEDIUM'
     },
-    checkin_time: {
+    checkinTime: {
+        type: Date,
+        default: null
+    },
+    expectedCheckoutTime: {
+        type: Date,
+        default: null
+    },
+    checkoutTime: {
         type: Date
     },
-    expected_checkout_time: {
-        type: Date
-    },
-    checkout_time: {
-        type: Date
-    },
-    extra_time: {
+    extraTime: {
         type: Number
     },
-    rental_price: {
+    rentalPrice: {
         type: Number,
         required: true,
         default: 20
@@ -51,16 +54,16 @@ const lockerSchema = new Schema({
 lockerSchema.pre('save', function (next) {
     switch (this.size) {
         case 'SMALL':
-            this.rental_price = 0.3;
+            this.rentalPrice = 0.3;
             break;
         case 'MEDIUM':
-            this.rental_price = 0.5;
+            this.rentalPrice = 0.5;
             break;
         case 'LARGE':
-            this.rental_price = 0.8;
+            this.rentalPrice = 0.8;
             break;
         default:
-            this.rental_price = 0.5;
+            this.rentalPrice = 0.5;
     }
     next();
 });

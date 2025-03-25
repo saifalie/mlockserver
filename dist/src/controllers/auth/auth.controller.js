@@ -10,45 +10,52 @@ import { UnauthoirzedException } from '../../errors/unauthorized.js';
 import admin from '../../config/firebase.js';
 import { InternalException } from '../../errors/internal-exception.js';
 export const signInWithGoogle = async (req, res) => {
-    const { name, profile_picture, id_token } = req.body;
-    console.log(id_token);
+    const { name, profilePicture, idToken, fcmToken } = req.body;
+    console.log(idToken);
     console.log('got the signin request');
-    if (!id_token) {
-        throw new BadRequestException('ID token is required', ErrorCode.TOKEN_NOT_FOUND);
+    console.log(idToken, 'idtoken');
+    if (!idToken) {
+        throw new UnauthoirzedException('ID token is required', ErrorCode.INVALID_TOKEN);
     }
     try {
-        const decodedToken = await admin.auth().verifyIdToken(id_token);
+        const decodedToken = await admin.auth().verifyIdToken(idToken);
         const verifiedEmail = decodedToken.email;
         if (!verifiedEmail) {
-            throw new UnauthoirzedException('Invalid Token or expired', ErrorCode.INVALID_TOKEN);
+            throw new UnauthoirzedException('Invalid Token or expired', ErrorCode.SECRET_KEY_NOT_FOUND);
         }
         let user = await User.findOne({ email: verifiedEmail });
         if (user) {
             console.log('user is there');
-            const new_access_token = user.createAccessToken();
-            const new_refresh_token = user.createRefreshToken();
-            console.log('access', new_access_token);
-            console.log('refresh', new_refresh_token);
+            // Update FCM token if provided
+            if (fcmToken) {
+                user.fcmToken = fcmToken;
+                await user.save();
+            }
+            const newAccessToken = user.createAccessToken();
+            const newRefreshToken = user.createRefreshToken();
+            console.log('access', newAccessToken);
+            console.log('refresh', newRefreshToken);
             return res.status(StatusCodes.OK).json(new ApiResponse(StatusCodes.OK, {
                 user: {
                     name: user.name,
                     email: user.email,
-                    profile_picture: user.profile_picture,
-                    id: user._id
+                    profilePicture: user.profilePicture,
+                    _id: user._id
                 },
                 tokens: {
-                    access_token: new_access_token,
-                    refresh_token: new_refresh_token
+                    accessToken: newAccessToken,
+                    refreshToken: newRefreshToken
                 }
             }, 'User logged In'));
         }
-        if (!name || !profile_picture) {
-            throw new BadRequestException('Missing required fields for registeration: name, profile_picture', ErrorCode.FIELDS_NOT_FOUND);
+        if (!name || !profilePicture) {
+            throw new BadRequestException('Missing required fields for registeration: name, profilePicture', ErrorCode.FIELDS_NOT_FOUND);
         }
         user = new User({
             email: verifiedEmail,
-            name: name || 'saif',
-            profile_picture: profile_picture || 'profilePicture'
+            name: name || '',
+            profilePicture: profilePicture || 'profilePicture',
+            fcmToken: fcmToken || ''
         });
         await user.save();
         const accessToken = user.createAccessToken();
@@ -57,12 +64,12 @@ export const signInWithGoogle = async (req, res) => {
             user: {
                 name: user.name,
                 id: user._id,
-                profile_picture: user.profile_picture,
+                profilePicture: user.profilePicture,
                 email: user.email
             },
             tokens: {
-                access_token: accessToken,
-                refresh_token: refreshToken
+                accessToken: accessToken,
+                refreshToken: refreshToken
             }
         }, 'SuccessFully register the user'));
     }
@@ -72,26 +79,57 @@ export const signInWithGoogle = async (req, res) => {
     }
 };
 export const refresthToken = async (req, res) => {
-    const { refresh_token } = req.body;
-    if (!refresh_token) {
-        throw new BadRequestException('Refresh token is required', ErrorCode.TOKEN_NOT_FOUND);
+    const { refreshToken } = req.body;
+    console.log('refresh token: ', refreshToken);
+    if (!refreshToken) {
+        throw new BadRequestException('Refresh token is required', ErrorCode.SECRET_KEY_NOT_FOUND);
     }
     if (!REFRESH_TOKEN_SECRET) {
         throw new Error('ACCESS_TOKEN_SECRET is not defined');
     }
     try {
-        const payload = jwt.verify(refresh_token, REFRESH_TOKEN_SECRET);
+        const payload = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
         const user = await User.findById(payload.id);
         if (!user) {
             throw new NotFoundException('User not found', ErrorCode.USER_NOT_FOUND);
         }
-        const new_access_token = user.createAccessToken();
-        const new_refresh_token = user.createRefreshToken();
-        res.status(StatusCodes.OK).json(new ApiResponse(StatusCodes.OK, { access_token: new_access_token, refresh_token: new_refresh_token }, 'Refresh the tokens Successfully'));
+        const newAccessToken = user.createAccessToken();
+        const newRefreshToken = user.createRefreshToken();
+        res.status(StatusCodes.OK).json(new ApiResponse(StatusCodes.OK, { accessToken: newAccessToken, refreshToken: newRefreshToken }, 'Refresh the tokens Successfully'));
     }
     catch (error) {
         console.log('REFRESH_TOKENS: ', error);
         throw new UnauthoirzedException('Invalid Refresh Token', ErrorCode.INVALID_TOKEN);
+    }
+};
+export const getUser = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select('name email currentLocker profilePicture location');
+        console.log('user --- getuser: ', user);
+        res.status(StatusCodes.OK).json(new ApiResponse(StatusCodes.OK, user));
+    }
+    catch (error) {
+        console.log('GETUSER method auth.controller error: ', error);
+        throw new InternalException('Failed to fetch the user data', ErrorCode.AUTH_INTERNAL_EXCEPTION, error);
+    }
+};
+export const updateFcmToken = async (req, res) => {
+    const { fcmToken } = req.body;
+    if (!fcmToken) {
+        throw new BadRequestException('FCM token is required', ErrorCode.FIELDS_NOT_FOUND);
+    }
+    try {
+        const user = await User.findById(req.user.id);
+        if (!user) {
+            throw new NotFoundException('User not found', ErrorCode.USER_NOT_FOUND);
+        }
+        user.fcmToken = fcmToken;
+        await user.save();
+        res.status(StatusCodes.OK).json(new ApiResponse(StatusCodes.OK, { message: 'FCM token updated successfully' }, 'FCM token updated'));
+    }
+    catch (error) {
+        console.error('UPDATE_FCM_TOKEN: ', error);
+        throw new InternalException('Failed to update FCM token', ErrorCode.AUTH_INTERNAL_EXCEPTION, error);
     }
 };
 //# sourceMappingURL=auth.controller.js.map

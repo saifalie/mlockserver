@@ -1,36 +1,49 @@
 import mongoose, { Schema } from 'mongoose';
-const ratingSchema = new Schema({
+import { LockerStation } from './lockerStation.model.js';
+const ratingAndReviewSchema = new Schema({
     rating: {
         type: Number,
         enum: [1, 2, 3, 4, 5]
     },
-    user: {
-        type: Schema.Types.ObjectId,
-        ref: 'User'
-    },
-    locker_station: {
-        type: Schema.Types.ObjectId,
-        ref: 'LockerStation'
-    }
-}, { timestamps: true });
-const reviewSchema = new Schema({
     message: {
         type: String,
-        required: true
     },
     user: {
         type: Schema.Types.ObjectId,
-        ref: 'User'
+        ref: 'User',
+        required: true
     },
-    locker_station: {
+    lockerStation: {
         type: Schema.Types.ObjectId,
-        ref: 'LockerStation'
+        ref: "LockerStation",
+        required: true
     },
-    is_visible: {
+    isVisible: {
         type: Boolean,
+        required: true,
         default: true
     }
-}, { timestamps: true });
-export const Rating = mongoose.model('Rating', ratingSchema);
-export const Review = mongoose.model('Review', reviewSchema);
+});
+// Save Hook (works as-is)
+ratingAndReviewSchema.post('save', async function (doc) {
+    console.log(` save Updating average for station: ${doc.lockerStation}`);
+    await LockerStation.updateAverageRating(doc.lockerStation);
+});
+// Fix for findOneAndUpdate (post-hook)
+ratingAndReviewSchema.post('findOneAndUpdate', async function (doc) {
+    if (doc) {
+        console.log(`findoneandupdateg Updating average for station: ${doc.lockerStation}`);
+        await LockerStation.updateAverageRating(doc.lockerStation);
+    }
+});
+// Fix for deleteOne (pre-hook)
+ratingAndReviewSchema.pre('deleteOne', async function (next) {
+    const doc = await this.model.findOne(this.getFilter());
+    if (doc) {
+        console.log(`deleteone Updating average for station: ${doc.lockerStation}`);
+        await LockerStation.updateAverageRating(doc.lockerStation);
+    }
+    next();
+});
+export const RatingAndReview = mongoose.model('RatingAndReview', ratingAndReviewSchema);
 //# sourceMappingURL=rating&review.model.js.map

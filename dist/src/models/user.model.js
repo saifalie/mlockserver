@@ -14,12 +14,17 @@ const userSchema = new Schema({
         required: [true, 'Email is required'],
         unique: true
     },
-    profile_picture: {
+    profilePicture: {
         type: String
     },
-    current_locker: {
+    currentLocker: {
         type: Schema.Types.ObjectId,
-        ref: 'Locker'
+        ref: 'Locker',
+        default: null
+    },
+    fcmToken: {
+        type: String,
+        required: true
     },
     location: {
         type: { type: String, required: false },
@@ -47,7 +52,7 @@ userSchema.methods.createAccessToken = function () {
     // Sign and return a JWT access token with user data and an expiry time
     return jwt.sign({
         id: this._id,
-        full_name: this.name,
+        fullName: this.name,
         email: this.email
     }, ACCESS_TOKEN_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY });
 };
