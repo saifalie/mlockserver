@@ -40,7 +40,7 @@ export const signInWithGoogle = async (req, res) => {
                     name: user.name,
                     email: user.email,
                     profilePicture: user.profilePicture,
-                    _id: user._id
+                    id: user._id
                 },
                 tokens: {
                     accessToken: newAccessToken,

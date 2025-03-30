@@ -6,6 +6,8 @@ import { ApiResponse } from '../../utils/apiResponse.js';
 import { NotFoundException } from '../../errors/not-found.js';
 import { BadRequestException } from '../../errors/bad-request.js';
 import { RatingAndReview } from '../../models/rating&review.model.js';
+import { Types } from 'mongoose';
+import { User } from '../../models/user.model.js';
 export const getAllLockerStations = async (req, res) => {
     try {
         const result = await LockerStation.find().populate({
@@ -67,7 +69,7 @@ export const getLockerStationById = async (req, res, next) => {
             throw new NotFoundException('Locker Station not found', ErrorCode.LOCKER_NOT_FOUND);
         }
         console.log('detail Station:', lockerStation);
-        console.log('detail Station:', lockerStation.averageRating);
+        console.log('average rating:', lockerStation.averageRating);
         const stationData = lockerStation.toJSON({ virtuals: true });
         return res.status(StatusCodes.OK).json(new ApiResponse(StatusCodes.OK, {
             lockerStation: stationData,
@@ -108,11 +110,81 @@ export const createRating = async (req, res, next) => {
             throw new NotFoundException('Not found lockerstation', ErrorCode.LOCKERSTATION_NOT_FOUND);
         }
         lockerStation.ratingAndReviews.push(ratingDoc._id);
+        await lockerStation.save();
         res.status(StatusCodes.CREATED).json(new ApiResponse(StatusCodes.CREATED, { success: true, data: ratingDoc }));
     }
     catch (error) {
         console.log('Creating rating error :', error);
         throw new InternalException('Creating rating error', ErrorCode.RATING_ERROR, error);
+    }
+};
+export const toggleSaveStation = async (req, res) => {
+    try {
+        console.log('removing it ');
+        const { lockerStationId } = req.params;
+        const userId = req.user.id;
+        const user = await User.findById(userId);
+        if (!user) {
+            throw new NotFoundException('User not found', ErrorCode.USER_NOT_FOUND);
+        }
+        const lockerStationObjectId = new Types.ObjectId(lockerStationId);
+        const stationIndex = user.favourite.findIndex(id => id.equals(lockerStationObjectId));
+        if (stationIndex === -1) {
+            // Add to favorites
+            user.favourite.push(lockerStationObjectId);
+        }
+        else {
+            // Remove from favorites
+            user.favourite.splice(stationIndex, 1);
+        }
+        await user.save();
+        res.status(StatusCodes.OK).json(new ApiResponse(StatusCodes.OK, { isSaved: stationIndex === -1 }, 'Success'));
+    }
+    catch (error) {
+        console.log('Toggle save error:', error);
+        throw new InternalException('Failed to toggle save status', ErrorCode.INTERNAL_EXCEPTION, error);
+    }
+};
+export const checkStationSaved = async (req, res) => {
+    try {
+        const { lockerStationId } = req.params;
+        const userId = req.user.id;
+        const user = await User.findById(userId);
+        if (!user) {
+            throw new NotFoundException('User not found', ErrorCode.USER_NOT_FOUND);
+        }
+        const lockerStationObjectId = new Types.ObjectId(lockerStationId);
+        const isSaved = user.favourite.some(id => id.equals(lockerStationObjectId));
+        res.status(StatusCodes.OK).json(new ApiResponse(StatusCodes.OK, { isSaved }, 'Success'));
+    }
+    catch (error) {
+        console.log('Check saved error:', error);
+        throw new InternalException('Failed to check save status', ErrorCode.INTERNAL_EXCEPTION, error);
+    }
+};
+export const getSavedStations = async (req, res) => {
+    console.log('saved station callllgasldgllaagakgghghasdghghaisghaisghasdghasdghiosdahgiasdhgiadshga');
+    try {
+        const userId = req.user.id;
+        console.log('saved stations userID:', req.user.id);
+        const user = await User.findById(userId).select('favourite')
+            .populate({
+            path: 'favourite',
+            select: 'stationName status address images location averageRating',
+            // populate: {
+            //     path: 'ratingAndReviews',
+            //     select: 'rating'
+            // }
+        });
+        if (!user) {
+            throw new NotFoundException('User not found', ErrorCode.USER_NOT_FOUND);
+        }
+        console.log('savedStations:  ', user);
+        res.status(StatusCodes.OK).json(new ApiResponse(StatusCodes.OK, user.favourite, 'Saved stations retrieved'));
+    }
+    catch (error) {
+        console.log('Error fetching saved stations:', error);
+        throw new InternalException('Failed to get saved stations', ErrorCode.INTERNAL_EXCEPTION, error);
     }
 };
 //# sourceMappingURL=lockerStation.controller.js.map

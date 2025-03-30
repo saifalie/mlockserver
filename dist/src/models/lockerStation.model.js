@@ -82,84 +82,39 @@ const LockerStationSchema = new Schema({
     ]
 }, { timestamps: true });
 LockerStationSchema.statics.updateAverageRating = async function (lockerStationId) {
-    const aggregateResult = await this.aggregate([
-        // 1. Match the locker station by ID
-        { $match: { _id: lockerStationId } },
-        // 2. Join with ratingAndReviews collection
-        {
-            $lookup: {
-                from: 'ratingandreviews',
-                localField: 'ratingAndReviews',
-                foreignField: '_id',
-                as: 'reviews',
-            },
-        },
-        // 3. Unwind reviews (safeguard against empty arrays)
-        { $unwind: { path: '$reviews', preserveNullAndEmptyArrays: false } },
-        // 4. Validate rating is a number and project it
-        {
-            $project: {
-                validRating: {
-                    $cond: {
-                        if: { $eq: [{ $type: '$reviews.rating' }, 'number'] },
-                        then: '$reviews.rating',
-                        else: null,
-                    },
+    try {
+        const aggregateResult = await this.aggregate([
+            { $match: { _id: lockerStationId } },
+            {
+                $lookup: {
+                    from: 'ratingandreviews', // Make sure this matches your collection name exactly
+                    localField: 'ratingAndReviews',
+                    foreignField: '_id',
+                    as: 'reviews',
                 },
             },
-        },
-        // 5. Group and calculate average
-        {
-            $group: {
-                _id: '$_id',
-                averageRating: { $avg: '$validRating' },
+            { $unwind: { path: '$reviews', preserveNullAndEmptyArrays: true } },
+            {
+                $group: {
+                    _id: '$_id',
+                    averageRating: { $avg: '$reviews.rating' },
+                    count: { $sum: 1 }
+                },
             },
-        },
-    ]);
-    // 6. Update the locker station's averageRating
-    let averageRating = aggregateResult[0]?.averageRating ?? null;
-    await this.findByIdAndUpdate(lockerStationId, { averageRating }, { new: true });
+        ]);
+        console.log('Aggregate result:', aggregateResult);
+        let averageRating = null;
+        if (aggregateResult.length > 0 && aggregateResult[0].count > 0) {
+            averageRating = aggregateResult[0].averageRating;
+        }
+        const updated = await this.findByIdAndUpdate(lockerStationId, { averageRating }, { new: true });
+        console.log('Updated locker station with average rating:', updated?.averageRating);
+        return updated;
+    }
+    catch (error) {
+        console.error('Error updating average rating:', error);
+        throw error;
+    }
 };
-// LockerStationSchema.statics.updateAverageRating = async function(
-//     lockerStationId: Types.ObjectId
-// ){
-//     const aggregateResult = await this.aggregate([
-//         {
-//             $match:{
-//                 _id:lockerStationId
-//             }
-//         },
-//         {
-//             $lookup:{
-//                 from:'ratingandreviews',
-//                 localField:'ratingAndReviews',
-//                 foreignField:'_id',
-//                 as:'reviews'
-//             }
-//         },
-//         {
-//             $unwind: '$reviews'
-//         },
-//         {
-//             $group:{
-//                 _id:'$_id',
-//                 averageRating:{$avg :'$reviews.rating'}
-//             }
-//         }
-//     ])
-//     let averageRating = null;
-//     if(aggregateResult.length >0){
-//         averageRating =aggregateResult[0].averageRating
-//     }
-//     await this.findByIdAndUpdate(
-//         lockerStationId,
-//         {
-//             averageRating:averageRating
-//         },
-//         {
-//             new:true
-//         }
-//     )
-// }
 export const LockerStation = mongoose.model('LockerStation', LockerStationSchema);
 //# sourceMappingURL=lockerStation.model.js.map

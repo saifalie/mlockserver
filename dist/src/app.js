@@ -10,6 +10,7 @@ import { buildAdminRouter } from './config/setup.js';
 import rootRouter from './routes/index.routes.js';
 import cors from 'cors';
 import { initializeCronJobs } from './jobs/index.js';
+import { initializeMQTT } from './mqtt/mqttClients.js';
 dotenv.config();
 // Initialize express app
 const app = express();
@@ -46,6 +47,8 @@ const espAddress = process.env.ESP_WEBSOCKET_ADDRESS || '';
 // const espClient = new ESPWebSocketClient(espAddress)
 //ws esp
 // app.use('/esp',ledRouter(espClient))
+// MQTT initialize
+initializeMQTT();
 // Middlewares
 app.use(errorMiddleware);
 app.use(notFoundMiddleware);
