@@ -32,6 +32,7 @@
         "http-status-codes": "^2.3.0",
         "jsonwebtoken": "^9.0.2",
         "mongoose": "^8.7.2",
+        "mqtt": "^5.10.4",
         "multer": "^1.4.5-lts.1",
         "node-cron": "^3.0.3",
         "razorpay": "^2.9.5",

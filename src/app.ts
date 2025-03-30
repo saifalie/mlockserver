@@ -16,6 +16,7 @@ import cors from 'cors';
 import { initializeCronJobs } from './jobs/index.js';
 import { ledRouter } from './websocket/led.routes.js';
 import { ESPWebSocketClient } from './websocket/espClient.js';
+import { initializeMQTT, sendCommand } from './mqtt/mqttClients.js';
 
 dotenv.config();
 
@@ -44,6 +45,7 @@ const io = new Server(server, {
     }
 });
 
+
 // Attach the websocket instance to the request object
 app.use((req: Request, res: Response, next: NextFunction) => {
     req.io = io;
@@ -63,6 +65,10 @@ const  espAddress = process.env.ESP_WEBSOCKET_ADDRESS || '';
 // const espClient = new ESPWebSocketClient(espAddress)
 //ws esp
 // app.use('/esp',ledRouter(espClient))
+
+// MQTT initialize
+initializeMQTT();
+
 
 // Middlewares
 app.use(errorMiddleware);

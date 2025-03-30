@@ -8,6 +8,7 @@ import { NotFoundException } from '../../errors/not-found.js';
 import { BadRequestException } from '../../errors/bad-request.js';
 import { RatingAndReview } from '../../models/rating&review.model.js';
 import { Types } from 'mongoose';
+import { User } from '../../models/user.model.js';
 
 export const getAllLockerStations = async (req: Request, res: Response) => {
     try {
@@ -77,7 +78,7 @@ export const getLockerStationById = async (req: Request, res: Response, next: Ne
         }
 
         console.log('detail Station:',lockerStation);
-        console.log('detail Station:',lockerStation.averageRating);
+        console.log('average rating:',lockerStation.averageRating);
 
         const stationData = lockerStation.toJSON({virtuals:true})
         
@@ -137,6 +138,7 @@ export const createRating = async(req:Request, res:Response,next:NextFunction) =
      }
 
      lockerStation.ratingAndReviews.push(ratingDoc._id as Types.ObjectId )
+     await lockerStation.save();
 
 
      res.status(StatusCodes.CREATED).json(new ApiResponse(StatusCodes.CREATED,{success:true, data:ratingDoc}))
@@ -149,3 +151,97 @@ export const createRating = async(req:Request, res:Response,next:NextFunction) =
     
    }
 }
+
+
+
+export const toggleSaveStation = async (req: Request, res: Response) => {
+    try {
+        console.log('removing it ');
+        
+        const { lockerStationId } = req.params;
+        const userId = req.user.id;
+
+        const user = await User.findById(userId);
+
+        if (!user) {
+            throw new NotFoundException('User not found', ErrorCode.USER_NOT_FOUND);
+        }
+
+        const lockerStationObjectId = new Types.ObjectId(lockerStationId);
+        
+        const stationIndex = user.favourite.findIndex(id => id.equals(lockerStationObjectId));
+        
+        if (stationIndex === -1) {
+            // Add to favorites
+            user.favourite.push(lockerStationObjectId);
+        } else {
+            // Remove from favorites
+            user.favourite.splice(stationIndex, 1);
+        }
+
+        await user.save();
+        res.status(StatusCodes.OK).json(new ApiResponse(StatusCodes.OK, { isSaved: stationIndex === -1 }, 'Success'));
+
+    } catch (error) {
+        console.log('Toggle save error:', error);
+        throw new InternalException('Failed to toggle save status', ErrorCode.INTERNAL_EXCEPTION, error); 
+    }
+}
+
+
+export const checkStationSaved = async (req: Request, res: Response) => {
+    try {
+        const { lockerStationId } = req.params;
+        const userId = req.user.id;
+
+        const user = await User.findById(userId);
+
+        if (!user) {
+            throw new NotFoundException('User not found', ErrorCode.USER_NOT_FOUND);
+        }
+
+        const lockerStationObjectId = new Types.ObjectId(lockerStationId);
+        const isSaved = user.favourite.some(id => id.equals(lockerStationObjectId));
+
+        res.status(StatusCodes.OK).json(new ApiResponse(StatusCodes.OK, { isSaved }, 'Success'));
+        
+    } catch (error) {
+        console.log('Check saved error:', error);
+        throw new InternalException('Failed to check save status', ErrorCode.INTERNAL_EXCEPTION, error);
+    }
+}
+
+
+export const getSavedStations = async (req: Request, res: Response) => {
+    console.log('saved station callllgasldgllaagakgghghasdghghaisghaisghasdghasdghiosdahgiasdhgiadshga');
+    
+    try {
+        const userId = req.user.id;
+        console.log('saved stations userID:',req.user.id);
+        
+        
+        const user = await User.findById(userId).select('favourite')
+            .populate({
+                path: 'favourite',
+                select: 'stationName status address images location averageRating',
+                // populate: {
+                //     path: 'ratingAndReviews',
+                //     select: 'rating'
+                // }
+            });
+
+        if (!user) {
+            throw new NotFoundException('User not found', ErrorCode.USER_NOT_FOUND);
+        }
+
+        console.log('savedStations:  ',user);
+        
+
+        res.status(StatusCodes.OK).json(
+            new ApiResponse(StatusCodes.OK, user.favourite, 'Saved stations retrieved')
+        );
+    } catch (error) {
+        console.log('Error fetching saved stations:', error);
+        throw new InternalException('Failed to get saved stations', ErrorCode.INTERNAL_EXCEPTION, error);
+    }
+};
