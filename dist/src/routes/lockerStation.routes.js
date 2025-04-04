@@ -7,7 +7,7 @@ lockerStationRoutes.route('/').get(errorHandler(auth), errorHandler(getAllLocker
 lockerStationRoutes.route('/nearMe').get(errorHandler(auth), errorHandler(getLockerStationNearMe));
 lockerStationRoutes.route('/saved').get(errorHandler(auth), errorHandler(getSavedStations));
 lockerStationRoutes.route('/create-rating-review').post(errorHandler(auth), errorHandler(createRating));
-lockerStationRoutes.route('/:lockerStationId').get(errorHandler(getLockerStationById));
+lockerStationRoutes.route('/:lockerStationId').get(errorHandler(auth), errorHandler(getLockerStationById));
 lockerStationRoutes.route('/:lockerStationId/save').put(errorHandler(auth), errorHandler(toggleSaveStation));
 lockerStationRoutes.route('/:lockerStationId/saved-status').get(errorHandler(auth), errorHandler(checkStationSaved));
 export default lockerStationRoutes;

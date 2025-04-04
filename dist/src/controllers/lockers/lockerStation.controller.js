@@ -65,6 +65,8 @@ export const getLockerStationById = async (req, res, next) => {
             select: 'lockerNumber status size rentalPrice doorStatus'
         })
             .exec();
+        const user = await User.findById(req.user.id).select('currentLocker');
+        console.log('hasActiveBooking: ', user?.currentLocker ? true : false);
         if (!lockerStation) {
             throw new NotFoundException('Locker Station not found', ErrorCode.LOCKER_NOT_FOUND);
         }
@@ -73,7 +75,8 @@ export const getLockerStationById = async (req, res, next) => {
         const stationData = lockerStation.toJSON({ virtuals: true });
         return res.status(StatusCodes.OK).json(new ApiResponse(StatusCodes.OK, {
             lockerStation: stationData,
-            averageRating: lockerStation.averageRating
+            averageRating: lockerStation.averageRating,
+            hasActiveBooking: user?.currentLocker ? true : false
             // RatingAndReviews: lockerStation.ratingAndReviews,
             // lockers: lockerStation.lockers,
             // openingHours: lockerStation.openingHours
