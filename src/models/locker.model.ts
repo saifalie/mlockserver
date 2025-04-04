@@ -1,6 +1,6 @@
 import mongoose, { Document, Schema, Types } from 'mongoose';
 
-interface Locker extends Document {
+export interface ILocker extends Document {
     lockerNumber: number;
     status: string;
     doorStatus: string;
@@ -14,7 +14,7 @@ interface Locker extends Document {
     history: Types.ObjectId[];
 }
 
-const lockerSchema = new Schema<Locker>({
+const lockerSchema = new Schema<ILocker>({
     lockerNumber: {
         type: Number,
         required: true,
@@ -89,4 +89,4 @@ lockerSchema.pre('save', function (next) {
     next();
 });
 
-export const Locker = mongoose.model<Locker>('Locker', lockerSchema);
+export const Locker = mongoose.model<ILocker>('Locker', lockerSchema);

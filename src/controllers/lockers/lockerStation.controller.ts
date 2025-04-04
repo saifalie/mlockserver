@@ -53,6 +53,7 @@ export const getLockerStationNearMe = async (req: Request, res: Response) => {
 export const getLockerStationById = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { lockerStationId } = req.params;
+      
 
         if (!lockerStationId) {
             throw new NotFoundException('LockerId not found', ErrorCode.LOCKER_NOT_FOUND);
@@ -73,6 +74,14 @@ export const getLockerStationById = async (req: Request, res: Response, next: Ne
             })
             .exec();
 
+
+            const user = await User.findById(req.user.id).select('currentLocker')
+
+            console.log('hasActiveBooking: ',user?.currentLocker ? true:false);
+            
+
+
+
         if (!lockerStation) {
             throw new NotFoundException('Locker Station not found', ErrorCode.LOCKER_NOT_FOUND);
         }
@@ -88,7 +97,8 @@ export const getLockerStationById = async (req: Request, res: Response, next: Ne
                 StatusCodes.OK,
                 {
                     lockerStation: stationData,
-                    averageRating:lockerStation.averageRating
+                    averageRating:lockerStation.averageRating,
+                    hasActiveBooking:user?.currentLocker ?true:false
 
                     // RatingAndReviews: lockerStation.ratingAndReviews,
                     // lockers: lockerStation.lockers,

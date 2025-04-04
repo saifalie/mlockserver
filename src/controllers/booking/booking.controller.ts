@@ -12,8 +12,9 @@ import { ErrorCode } from '../../errors/root.js';
 import { NotFoundException } from '../../errors/not-found.js';
 import mongoose, { Types } from 'mongoose';
 import { User } from '../../models/user.model.js';
-import { Locker } from '../../models/locker.model.js';
+import { ILocker, Locker } from '../../models/locker.model.js';
 import { log } from 'util';
+import { LockerControllerService } from '../../mqtt/lockerController.service.js';
 
 export const createBooking = async (req: Request, res: Response, next: NextFunction) => {
     const { amount, currency, lockerId, duration, rentalPrice,lockerStationId } = req.body;
@@ -147,6 +148,19 @@ export const verifyPayment = async (req: Request, res: Response, next: NextFunct
         ])
 
         await session.commitTransaction();
+
+        try {
+
+            const lockerNumber =  (locker.lockerNumber).toString()
+
+            await LockerControllerService.openLocker(lockerNumber);
+
+            console.log(`Locker ${lockerNumber} opened for user ${user._id}`);
+            
+        } catch (lockerError) {
+            console.error(`Failed to open locke, but transaction was successful: ${lockerError}`);
+            
+        }
 
         res.status(StatusCodes.CREATED).json(new ApiResponse(StatusCodes.CREATED, {payment,booking}, 'payment successfully processed and booking updated'));
 
@@ -333,8 +347,20 @@ export const verifyCheckoutPayment = async (req: Request, res: Response, next: N
             booking: bookingId
         });
 
+
+            // Get booking and store lockerNumber before modifications
+            const booking = await Booking.findById(bookingId)
+            .populate<{locker:ILocker}>('locker')
+            .session(session);
+
+            if (!booking) {
+                throw new NotFoundException('Booking not found', ErrorCode.FILE_NOT_FOUND);
+            }
+            
+            const lockerNumber = booking.locker.lockerNumber.toString();
+
         // 3. Update booking (same pattern as initial booking)
-        const booking = await Booking.findByIdAndUpdate(
+        const updatedBooking = await Booking.findByIdAndUpdate(
             bookingId,
             {
                 $push: { payments: payment._id },
@@ -344,9 +370,7 @@ export const verifyCheckoutPayment = async (req: Request, res: Response, next: N
             { new: true, session }
         ).populate('locker lockerStation');
 
-        if (!booking) {
-            throw new NotFoundException('Booking not found', ErrorCode.FILE_NOT_FOUND);
-        }
+       
 
         // 4. Perform final checkout operations
         await performCheckout(booking, session, new Date());
@@ -354,6 +378,16 @@ export const verifyCheckoutPayment = async (req: Request, res: Response, next: N
         // 5. Save everything atomically
         await payment.save({ session });
         await session.commitTransaction();
+
+
+             // After transaction success, open the locker
+             try {
+                await LockerControllerService.openLocker(lockerNumber);
+                console.log(`Locker ${lockerNumber} opened for checkout after extra time payment`);
+            } catch (lockerError) {
+                console.error('Failed to open locker after extra time payment, but payment was successful:', lockerError);
+                // Consider sending a notification to admin here
+            }
 
         res.status(StatusCodes.OK).json(
             new ApiResponse(StatusCodes.OK, { booking, payment }, 'Payment verified and checkout completed')
@@ -374,7 +408,7 @@ export const directCheckout = async (req: Request, res: Response, next: NextFunc
     try {
         const { bookingId } = req.body;
         const booking = await Booking.findById(bookingId)
-        .populate({
+        .populate<{locker:ILocker}>({
             path:'locker',
             select:'lockerNumber doorStatus size rentalPrice'
         })
@@ -386,8 +420,25 @@ export const directCheckout = async (req: Request, res: Response, next: NextFunc
         
         if (!booking) throw new NotFoundException('Booking not found', ErrorCode.FILE_NOT_FOUND);
 
+
+        const lockerNumber = (booking.locker as ILocker).lockerNumber.toString()
+      
+
+
         await performCheckout(booking, session, new Date());
         await session.commitTransaction();
+
+
+
+        // After successful checkout transaction, open the locker
+        try {
+
+            await LockerControllerService.openLocker(lockerNumber)
+            console.log(`Locker ${lockerNumber} opened for checkout`);
+        } catch (lockerError) {
+            console.error('Failed to open locker for checkout, but checkout was successful:', lockerError);
+            
+        }
 
         res.status(StatusCodes.OK).json(new ApiResponse(StatusCodes.OK, booking, 'Checkout completed successfully'));
 
@@ -429,181 +480,4 @@ async function performCheckout(booking: any, session: mongoose.mongo.ClientSessi
     await booking.save({ session });
     
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// export const processCheckout = async (req: Request, res: Response, next: NextFunction) => {
-//     const session = await mongoose.startSession();
-//     session.startTransaction();
-
-//     try {
-//         const { bookingId } = req.body;
-//         const userId = req.user.id;
-//         const now = new Date();
-
-//         // 1. Find and validate booking
-//         const booking = await Booking.findById(bookingId)
-//             .populate('locker')
-//             .populate('user')
-//             .session(session);
-
-//         if (!booking) {
-//             throw new NotFoundException('Booking not found', ErrorCode.FILE_NOT_FOUND);
-//         }
-
-//         // 2. Verify ownership
-//         if (booking.user._id.toString() !== userId) {
-//             throw new InternalException('Unauthorized checkout', ErrorCode.HTTP_UNAUTHORIZED,{message:'unauthorized'});
-//         }
-
-//         // 3. Check if already checked out
-//         if (booking.userCheckoutTime) {
-//             throw new InternalException('Already checked out', ErrorCode.INTERNAL_EXCEPTION,{message:'already checkout'});
-//         }
-
-//         // 4. Calculate extra time and payment needed
-//         let extraPayment = 0;
-//         let extraTimeSeconds = 0;
-
-//         if (booking.checkoutTime && now > booking.checkoutTime) {
-//             extraTimeSeconds = Math.floor((now.getTime() - booking.checkoutTime.getTime()) / 1000);
-//             const extraMinutes = Math.ceil(extraTimeSeconds / 60);
-//             extraPayment = extraMinutes * booking.rentalPrice;
-//         }
-
-//         // 5. Handle extra time payment if needed
-//         if (extraPayment > 0) {
-//             // Create Razorpay order
-//             const razorpayOrder = await razorpay.orders.create({
-//                 amount: extraPayment * 100, // Convert to paise
-//                 currency: 'INR',
-//                 receipt: `extra_time_${Date.now()}`,
-//                 notes: {
-//                     type: 'EXTRA_TIME',
-//                     bookingId: bookingId,
-//                     extraTimeSeconds: extraTimeSeconds.toString()
-//                 }
-//             });
-
-//             // Create payment record
-//             const payment = new Payment({
-//                 orderId: razorpayOrder.id,
-//                 amount: extraPayment,
-//                 currency: 'INR',
-//                 status: 'PENDING',
-//                 method: 'razorpay',
-//                 booking: booking._id,
-//                 PaymentType:PaymentType.EXTRA_TIME
-//             });
-
-//             await payment.save({ session });
-
-//             // Return payment details to client
-//             await session.commitTransaction();
-//             return res.status(StatusCodes.PAYMENT_REQUIRED).json(
-//                 new ApiResponse(StatusCodes.PAYMENT_REQUIRED, {
-//                     paymentId: payment._id,
-//                     razorpayOrder,
-//                     key: process.env.RAZORPAY_KEY_ID
-//                 }, 'Extra time payment required')
-//             );
-//         }
-
-//         // 6. If no payment needed, complete checkout
-//         await performCheckout(booking, session, now);
-
-//         await session.commitTransaction();
-//         res.status(StatusCodes.OK).json(
-//             new ApiResponse(StatusCodes.OK, { booking }, 'Checkout completed successfully')
-//         );
-
-//     } catch (error) {
-//         await session.abortTransaction();
-//         next(error);
-//     } finally {
-//         session.endSession();
-//     }
-// };
-
-// export const confirmCheckoutPayment = async (req: Request, res: Response, next: NextFunction) => {
-//     const session = await mongoose.startSession();
-//     session.startTransaction();
-
-//     try {
-//         const { paymentId, orderId, signature, bookingId } = req.body;
-
-//         // 1. Validate payment signature
-//         const generatedSignature = crypto
-//             .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!)
-//             .update(orderId + "|" + paymentId)
-//             .digest('hex');
-
-//         if (generatedSignature !== signature) {
-//             throw new InternalException('Invalid payment signature', ErrorCode.INVALID_TOKEN,{message:'invalid signature'});
-//         }
-
-//         // 2. Update payment record
-//         const payment = await Payment.findOneAndUpdate(
-//             { orderId: orderId },
-//             {
-//                 paymentId: paymentId,
-//                 signature: signature,
-//                 status: 'PAID'
-//             },
-//             { new: true, session }
-//         );
-
-//         if (!payment) {
-//             throw new NotFoundException('Payment record not found', ErrorCode.FILE_NOT_FOUND);
-//         }
-
-//         // 3. Update booking with extended time
-//         const booking = await Booking.findById(bookingId).session(session);
-
-//         if(!booking){
-//             throw new NotFoundException('Booking not found',ErrorCode.BOOKING_NOT_FOUND)
-//         }
-//         const now = new Date();
-
-//         // if (payment.notes?.extraTimeSeconds) {
-//         //     const extraTime = parseInt(payment.notes.extraTimeSeconds);
-//         //     booking.checkoutTime = new Date(now.getTime() + extraTime * 1000);
-//         //     booking.extraTime += extraTime;
-//         // }
-
-//         // 4. Complete the checkout
-//         await performCheckout(booking, session, now);
-
-//         await session.commitTransaction();
-//         res.status(StatusCodes.OK).json(
-//             new ApiResponse(StatusCodes.OK, { booking }, 'Payment verified and checkout completed')
-//         );
-
-//     } catch (error) {
-//         await session.abortTransaction();
-//         next(error);
-//     } finally {
-//         session.endSession();
-//     }
-// };
 

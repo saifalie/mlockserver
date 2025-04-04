@@ -16,7 +16,7 @@ import cors from 'cors';
 import { initializeCronJobs } from './jobs/index.js';
 import { ledRouter } from './websocket/led.routes.js';
 import { ESPWebSocketClient } from './websocket/espClient.js';
-import { initializeMQTT, sendCommand } from './mqtt/mqttClients.js';
+import { RelayMQTTClient } from './mqtt/mqttClients.js';
 
 dotenv.config();
 
@@ -67,7 +67,13 @@ const  espAddress = process.env.ESP_WEBSOCKET_ADDRESS || '';
 // app.use('/esp',ledRouter(espClient))
 
 // MQTT initialize
-initializeMQTT();
+
+const mqttClient = new RelayMQTTClient({
+    maxReconnectAttempts: 5,
+    reconnectTimeout: 3000
+});
+
+// initializeMQTT();
 
 
 // Middlewares

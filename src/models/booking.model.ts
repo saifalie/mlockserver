@@ -1,4 +1,5 @@
 import { Document, model, Schema, Types } from 'mongoose';
+import { ILocker } from './locker.model.js';
 
 export enum PaymentStatus {
     PAID = 'PAID',
@@ -11,7 +12,7 @@ export enum PaymentStatus {
 interface Booking extends Document {
     user: Types.ObjectId;
     locker: Types.ObjectId;
-    lockerStation:Types.ObjectId
+    lockerStation:Types.ObjectId | ILocker
     duration: number;
     checkinTime: Date;
     checkoutTime: Date;
