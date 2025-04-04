@@ -2,6 +2,7 @@ import mqtt from "mqtt";
 import { InternalException } from "../errors/internal-exception.js";
 import { ErrorCode } from "../errors/root.js";
 import { EventEmitter } from "events";
+import { Locker } from "../models/locker.model.js";
 export class RelayMQTTClient extends EventEmitter {
     constructor(options = {}) {
         super();
@@ -46,9 +47,10 @@ export class RelayMQTTClient extends EventEmitter {
                 this.client.subscribe(this.TOPICS.STATUS_UPDATE);
                 this.emit('connected');
             });
-            this.client.on('message', (topic, message) => {
+            this.client.on('message', async (topic, message) => {
                 const msg = message.toString();
                 console.log(`Received message on ${topic}: ${msg}`);
+                await udpateDoorStatus(msg);
                 if (topic === this.TOPICS.STATUS_UPDATE) {
                     this.emit('status', msg);
                 }
@@ -120,6 +122,23 @@ export function getMQTTClient() {
     }
     return mqttClientInstance;
 }
+const udpateDoorStatus = async (data) => {
+    try {
+        console.log('updatedoorstatus method: message:', data);
+        const message = data.split(' ');
+        const lockerNumber = parseInt(message[1]);
+        const doorStatus = message[0].toString();
+        console.log('door status udpatedoorstatus method: ', doorStatus);
+        await Locker.findOneAndUpdate({ lockerNumber: lockerNumber }, {
+            doorStatus: doorStatus
+        });
+        console.log('successfully update the server door status');
+    }
+    catch (error) {
+        console.error('udpateDoorStatus method: failed to update the server door status');
+        throw new InternalException(' failed to update the server door status', ErrorCode.INTERNAL_EXCEPTION, error);
+    }
+};
 // // src/mqtt/mqtt.ts
 // import mqtt, { MqttClient } from 'mqtt';
 // let mqttClient: MqttClient;

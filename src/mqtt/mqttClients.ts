@@ -158,8 +158,13 @@ export function getMQTTClient(): RelayMQTTClient {
 const udpateDoorStatus =async (data:string)=>{
 
     try {
-        const lockerNumber = data.split(' ')[1];
-        const doorStatus = data.split(' ')[0]
+        console.log('updatedoorstatus method: message:',data);
+        
+        const message = data.split(' ')
+        const lockerNumber = parseInt(message[1])
+        const doorStatus = message[0].toString()
+        console.log('door status udpatedoorstatus method: ',doorStatus);
+        
 
         
         await Locker.findOneAndUpdate({lockerNumber:lockerNumber},{
