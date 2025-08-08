@@ -27,7 +27,7 @@ app.use(express.json());
 // app.use(helmet());
 
 
-// Hello
+// Hello windows 11
 app.use(cors({
     origin:['http://localhost:7000', 'http://192.168.10.109:7000', 'http://49.43.5.123:7000'],
     credentials: true
